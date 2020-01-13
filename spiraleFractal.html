@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+ <head>
+   <style type="text/css">
+     body {
+       background-color: #136c7d;
+       text-align: center;
+     }
+   </style>
+ </head>
+ <body onload="draw();">  
+   <canvas id="canvas" width="1920" height="1080"></canvas>      
+   <script type="application/javascript">
+       const canvas = document.getElementById("canvas");           
+       const ctx = canvas.getContext("2d");
+          
+       const rect = function (x, y, size, angle = 0, grayLevel = 0) {
+          ctx.save(); 
+          ctx.fillStyle = `rgb(${grayLevel},${grayLevel},${grayLevel})`;
+                         
+          ctx.translate(x + size / 2, y + size / 2);         
+          ctx.rotate(angle * Math.PI / 180); 
+         
+          ctx.fillRect(-size, -size, size, size);                                                         
+          ctx.restore();           
+       };
+     
+       const plot = function(x, y, size = 1, grayLevel = 0) {
+          ctx.fillStyle = `rgb(${grayLevel},${grayLevel},${grayLevel})`;                  
+          ctx.beginPath();
+          ctx.arc(x, y, size, 0, 2 * Math.PI, false);     
+          ctx.fill();
+       };
+     
+       const gf = function(config = {}) {
+            let x0 = config.x,
+                y0 = config.y,
+                r = 1,
+                recurcyDepth = config.recurcyDepth || 1,
+                grayLevel = config.grayLevelStart || 0,
+                lineWidth = config.lineWidthStart || 1,
+                shapes = config.shapes || [],
+                rectAngle = 60,
+                rectSize = config.rectSize || 1;         
+       
+            for (let i = 0; i < config.length; i++) {              
+              r += config.radiusStep * i / config.radiusAccel;
+              
+              let k = .002,
+                  x = x0 + r * Math.sin(i * k),
+                  y = y0 + r * Math.cos(i * k),
+                  grayLevelK = 840000,
+                  widthAccelK = .71,
+                  rectAngleAccel = 25000,
+                  rectAngleStep = 1,
+                  rectSizeAccel = .25;
+                            
+              (lineWidth > 1) && (lineWidth -= config.lineWidthStart / config.length * widthAccelK);
+              
+              grayLevel += i / grayLevelK;              
+              let parentI = config.parentI || 0;              
+                                                                 
+              if (i % config.rectStep === 0) {                
+                  let
+                  dx = Math.abs(x0 - x),
+                  dy = Math.abs(y0 - y),
+                  
+                  L = Math.sqrt(dy * dy + dx * dx),
+                  Ls = rectSize - 4 + lineWidth,
+                  mind = 1,
+                  cosA = dx / L,
+                  sinA = dy / L,
+                  dxs1 = cosA * Ls,
+                  dys1 = sinA * Ls,
+                  dxs2 = cosA * -Ls,
+                  dys2 = sinA * -Ls,
+                  
+                  xs1 = x + (x < x0 ? 1 : -1) * dxs1,
+                  ys1 = y + (y < y0 ? 1 : -1) * dys1,
+                  xs2 = x + (x < x0 ? 1 : -1) * dxs2,
+                  ys2 = y + (y < y0 ? 1 : -1) * dys2;        
+                
+                  /*console.log({
+                    x0, y0, x, y, dx, dy, L, Ls, cosA, sinA, dxs, dys, xs, ys,
+                    Lsq: Ls*Ls, dxysq: dxs*dxs + dys*dys
+                  });*/
+                                                                           
+                  (rectAngle > 360) && (rectAngle = 0);
+                
+                  // rectAngle += rectAngleStep + rectAngleAccel / i;
+                  rectAngle = 0;
+                  rectSize += rectSizeAccel;                             
+                                
+                 shapes.push({type: 'rect', x: xs1, y: ys1, size: rectSize, angle: rectAngle, grayLevel, recurcyDepth, i, parentI, zIndex: parentI + i});
+                shapes.push({type: 'rect', x: xs2, y: ys2, size: rectSize, angle: rectAngle, grayLevel, recurcyDepth, i, parentI, zIndex: parentI + i});
+              }
+              
+              shapes.push({type: 'plot', x, y, lineWidth, grayLevel, recurcyDepth, i, parentI, zIndex: parentI + i});
+                                          
+              if ((config.fractalStep !== 0) && 
+                (i % config.fractalStep === 0) &&
+                (recurcyDepth < config.recurcyDepthMax) &&
+                (i >= config.fractalStart)) {
+                
+                let k1 = 1,
+                    k2 = 1500,
+                    k3 = .001;                    
+                
+                 gf({
+                    x: x,
+                    y: y,
+                    lineWidthStart: lineWidth,
+                    length: 10500 - recurcyDepth * k2,
+                    radiusStep: .03 + k3 * recurcyDepth,
+                    radiusAccel: 6500 * k1 * recurcyDepth,
+                    fractalStep: 1100,
+                    fractalStart: 4000,
+                    recurcyDepth: recurcyDepth + 1,
+                    grayLevelStart: grayLevel + 20,
+                    recurcyDepthMax: config.recurcyDepthMax,
+                    shapes: shapes,
+                    parentI: parentI + i,
+                    rectStep: config.rectStep                 
+                 });
+              }
+            }
+            
+           return shapes;
+       } 
+           
+       var draw = function() {      
+           const canvasWidth = 1920;
+           const canvasHeight = 1080;
+           const centerX = canvasWidth / 2;
+           const centerY = canvasHeight / 2;
+                 
+           let shapes = gf({
+              x: centerX,
+              y: centerY,
+              lineWidthStart: 12,
+              length: 15500,
+              // length: 6000,
+              radiusStep: .03,
+              radiusAccel: 5500,
+              fractalStep: 1990,
+              fractalStart: 5000,
+              // recurcyDepthMax: 0,
+              recurcyDepthMax: 3,
+              grayLevelStart: 50,
+              rectStep: 150
+           });
+         
+           shapes.sort((a,b) => (a.zIndex > b.zIndex) ? 1 : ((b.zIndex > a.zIndex) ? -1 : 0));                          
+            for (let i = 0; i < shapes.length; ++i) {
+              let shape = shapes[i];              
+              
+              shape.type === 'plot' ? plot(shape.x, shape.y, shape.lineWidth, shape.grayLevel)
+              : rect(shape.x, shape.y, shape.size, shape.angle, shape.grayLevel);
+              
+            }                 
+       }                            
+  </script>
+
+ </body>
+</html>
